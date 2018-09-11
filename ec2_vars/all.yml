@@ -1,0 +1,9 @@
+webserver_instance_type: t2.medium # Select the instance size you would like.
+webserver_image: ami-0ff8a91507f77f867 # This is Amazon Linux AMI, you can change to your own.
+webserver_security_group: ansible-webserver # Change the security group name here.
+webserver_subnet_ids: ['subnet-ID','subnet-ID','subnet-ID','subnet-ID'] # Add the subnets you would like to use.
+webserver_keypair: your_key # This is one of my keys that i already have in AWS.
+webserver_region: us-east-1 # Change the Region.
+webserver_vpcid: vpc-ID # VPC you would like to create the security group.
+webserver_count: 1 # How many servers you want to add.
+webserver_volumesize: 15 # Root disk size in GB.

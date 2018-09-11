@@ -1,0 +1,79 @@
+---
+      - name: Create a security group
+        local_action: 
+          module: ec2_group
+          name: "{{ webserver_security_group }}"
+          description: Security Group for webserver Servers
+          region: "{{ webserver_region }}"
+          vpc_id: "{{ webserver_vpcid }}"
+          rules:
+            - proto: tcp
+              from_port: 22
+              to_port: 22
+              cidr_ip: 0.0.0.0/0
+            - proto: tcp
+              from_port: 80
+              to_port: 80
+              cidr_ip: 0.0.0.0/0
+            - proto: tcp
+              from_port: 443
+              to_port: 443
+              cidr_ip: 0.0.0.0/0
+        register: basic_firewall
+
+      - name: Gather new SG ID # This will get the Security Group ID that was just created.
+        ec2_group_facts:
+        region: "{{ webserver_region }}"
+        filters:
+          group-name: "{{ webserver_security_group }}"
+        register: sg_facts
+
+      - name: Ansible SG ID
+        debug:
+          var: sg_facts['security_groups'][1]['group_id']
+
+      - name: Launch the new EC2 Instance # Launch new instance(s).
+        local_action:
+          module: ec2
+          key_name: "{{ webserver_keypair }}"
+          group_id: "{{ sg_facts['security_groups'][1]['group_id'] }}"
+          instance_type: "{{ webserver_instance_type }}"
+          image: "{{ webserver_image }}"
+          vpc_subnet_id: "{{ webserver_subnet_ids|random }}"
+          region: "{{ webserver_region }}"
+          assign_public_ip: yes
+          wait: true
+          count: 1
+          volumes:
+            - device_name: /dev/xvda
+              device_type: gp2
+              volume_size: "{{ webserver_volumesize }}"
+              delete_on_termination: true
+        register: ec2
+
+      - name: Add the newly created EC2 instance(s) to the local host group (located inside the directory)
+        local_action:
+          module: lineinfile
+          path: hosts.yml
+          regexp: "{{ item.public_ip }}"
+          insertafter: "[webserver-public]"
+          line: "{{ item.public_ip }}"
+          regexp: "{{ item.private_ip }}"
+          insertafter: "[webserver-private]"
+          line: "{{ item.private_ip }}"
+        with_items: "{{ ec2.instances }}"
+
+
+      - name: Wait for SSH to come up
+        local_action: wait_for 
+                      host={{ item.public_ip }} 
+                      port=22 
+                      state=started
+        with_items: "{{ ec2.instances }}"
+
+      - name: Add tag to Instance(s)
+        local_action: ec2_tag resource={{ item.id }} region={{ webserver_region }} state=present
+        with_items: "{{ ec2.instances }}"
+        args:
+          tags:
+            Name: webserver
