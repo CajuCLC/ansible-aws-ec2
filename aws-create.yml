@@ -1,0 +1,9 @@
+---
+  - name: Provision EC2 Instances
+    hosts: local
+    connection: local
+    gather_facts: False
+    pre_tasks:
+      - include_vars: ec2_vars/all.yml
+    roles:
+      - webserver
